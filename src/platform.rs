@@ -63,7 +63,7 @@ fn linux_is_musl() -> Result<bool> {
         .args(["-e", PROBE])
         .output()
         .map_err(|e| format!("Cannot run tsrs Linux libc detection: {e}"))?;
-    
+
     match (output.status, output.stdout.as_slice()) {
         (Some(0), b"musl") => Ok(true),
         (Some(0), b"gnu") => Ok(false),

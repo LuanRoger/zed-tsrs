@@ -30,7 +30,7 @@ impl zed::Extension for TsrsExtension {
                 installer::managed_binary(id, version)?
             }
         };
-        
+
         Ok(zed::Command {
             command,
             args: binary
