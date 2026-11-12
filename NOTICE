@@ -1,0 +1,12 @@
+zed-tsrs
+
+This extension adapts the repository scaffold and language-server integration
+patterns from zed-extensions/tsgo, distributed under the Apache License 2.0:
+https://github.com/zed-extensions/tsgo
+
+Modified for the independent, opt-in tsrs language server: extension metadata,
+binary overrides, pinned native installation, settings, tests and documentation.
+The original Apache-2.0 license is retained in LICENSE.
+
+Managed tsrs packages are separate third-party software. Their bundled licenses
+and notices are retained with the complete packages in the installation cache.

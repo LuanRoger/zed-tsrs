@@ -1,186 +1,120 @@
-# tsgo: Native TypeScript Compiler Integration for Zed
+# zed-tsrs
 
-This extension integrates TypeScript v7's native Go-based compiler and language server into the Zed editor, delivering enhanced performance and efficiency for TypeScript development.
+An independent, **opt-in** Zed extension for the [tsrs](https://github.com/oxc-project/tsrs) Rust TypeScript/JavaScript language server. Supports TypeScript, TSX, JavaScript, and JSX using Zed's existing grammars.
 
-## 🚀 Why the native compiler?
+Installing this extension does not select it for existing projects. It does not proxy LSP, change other servers' settings, or automatically switch servers based on a project's TypeScript version.
 
-With TypeScript 7, Microsoft shipped the TypeScript compiler as a native version written in Go, with significant performance improvements:
+## Install for development
 
-- **Faster Compilation**: Achieves up to 10x speed improvements in large projects.
-- **Reduced Memory Usage**: Optimized memory handling in native execution.
-- **Improved Editor Performance**: Faster IntelliSense and language services.
-- **Scalability**: Better handling of large codebases.
+Requires Rust and a current Zed release supporting manifest `opt_in_languages` and extension API 0.7.0. Older editors must be upgraded; do not remove the manifest's opt-in declarations as a workaround.
 
-> _Example Benchmarks_:
->
-> - **VS Code**: 77.8s → 7.5s (10.4x speedup)
-> - **Playwright**: 11.1s → 1.1s (10.1x speedup)
-> - **TypeORM**: 17.5s → 1.3s (13.5x speedup)
->
-> _Source: [Microsoft Developer Blog](https://devblogs.microsoft.com/typescript/typescript-native-port/)_
-
-## 🛠 Installation
-
-1. Open Zed's Extensions page.
-2. Search for `TypeScript Language Server` and install the extension.
-
-## ⚙️ Configuration
-
-### Basic Setup
-
-Enable `typescript-ls` in your Zed settings:
-
-```jsonc
-{
-    "languages": {
-        "TypeScript": {
-            "language_servers": [
-                "typescript-ls",
-                "!vtsls",
-                "!typescript-language-server",
-                "...",
-            ],
-        },
-        "TSX": {
-            "language_servers": [
-                "typescript-ls",
-                "!vtsls",
-                "!typescript-language-server",
-                "...",
-            ],
-        },
-    },
-}
+```sh
+rustup target add wasm32-wasip1
+cargo build --release --target wasm32-wasip1
 ```
 
-You can also use `typescript-ls` in tandem with other language servers (e.g. `typescript-language-server` or `vtsls`). Zed will use `typescript-ls` for features it supports and fallback to the next language server in the list for unsupported features.
-To do that with `vtsls`, use:
+In Zed, run **zed: install dev extension** from the command palette and select this repository. Zed builds the extension; a native `tsrs` server runs outside the extension's WASM sandbox. This repository is not a claim of marketplace availability.
 
-```jsonc
-{
-    "languages": {
-        "TypeScript": {
-            "language_servers": [
-                "typescript-ls",
-                "vtsls",
-                "!typescript-language-server",
-                "...",
-            ],
-        },
-        "TSX": {
-            "language_servers": [
-                "typescript-ls",
-                "vtsls",
-                "!typescript-language-server",
-                "...",
-            ],
-        },
-    },
-}
-```
+## Enable per project
 
-### Advanced Configuration
-
-#### Specifying a Package Version
-
-By default, the extension installs and uses the latest version of the `typescript` [npm package](https://www.npmjs.com/package/typescript?activeTab=versions). To pin a specific version (must be >= 7.0.0, older versions have no native language server):
+Add this to the target project's `.zed/settings.json`:
 
 ```json
 {
-    "lsp": {
-        "typescript-ls": {
-            "settings": {
-                "package_version": "7.0.2"
-            }
-        }
-    }
-}
-```
-
-This is useful for:
-
-- Ensuring consistent behavior across the project
-- Testing specific versions
-- Avoiding automatic updates that might introduce issues
-
-#### Inlay Hints
-
-The extension sets defaults to make `typescript-ls` send back inlay hints when Zed has inlay hints enabled. To show them, enable Zed's `inlay_hints` setting:
-
-```json
-{
-  "inlay_hints": {
-    "enabled": true
+  "languages": {
+    "TypeScript": { "language_servers": ["tsrs"] },
+    "TSX": { "language_servers": ["tsrs"] },
+    "JavaScript": { "language_servers": ["tsrs"] },
+    "JSX": { "language_servers": ["tsrs"] }
   }
 }
 ```
 
-You can override the default inlay hint settings in your Zed settings:
+These exclusive lists intentionally omit `vtsls`, `tsgo`, and every other language server for those languages in this project. Adding `"..."` may also start default servers; explicitly adding another server enables both. Other projects retain their own selections. For global opt-in, put the same configuration in Zed's user settings instead. Remove it to return to defaults.
+
+## Executable selection
+
+On every launch the extension resolves:
+
+1. `lsp.tsrs.binary.path`, if set.
+2. `tsrs` found through the worktree's PATH.
+3. A validated cached installation of the selected npm version.
+4. Installation of that exact version using Zed's npm runtime.
+
+A local executable takes precedence even when `package_version` is set. Invalid explicit overrides fail rather than silently using another version. Explicit host paths are launched by Zed, not checked against the WASM sandbox filesystem. Use an absolute native executable path, especially on Windows (not an npm `.cmd` shim); keep its required library assets intact.
 
 ```json
 {
   "lsp": {
-    "typescript-ls": {
-      "settings": {
-        "typescript": {
-          "inlayHints": {
-            "parameterNames": {
-              "enabled": "none"
-            },
-            "parameterTypes": {
-              "enabled": false
-            },
-            "variableTypes": {
-              "enabled": false
-            },
-            "propertyDeclarationTypes": {
-              "enabled": false
-            },
-            "functionLikeReturnTypes": {
-              "enabled": false
-            },
-            "enumMemberValues": {
-              "enabled": false
-            }
-          }
-        }
+    "tsrs": {
+      "binary": {
+        "path": "C:\\tools\\tsrs\\tsrs.exe",
+        "arguments": ["--lsp", "-stdio"],
+        "env": { "RUST_BACKTRACE": "1" }
       }
     }
   }
 }
 ```
 
-Use the same settings under `javascript` to override them for JavaScript.
+The default arguments are **`--lsp -stdio`**, verified against the published pinned release and upstream CLI. `binary.arguments`, when provided, **replaces** the entire argument list (including an empty list). Use it only for a compatible CLI. Custom binaries are not version-probed or upgraded by the extension.
 
-#### Code Lens
+### Managed installations
 
-The extension enables references and implementations code lenses by default. These show reference counts and implementation counts above functions, classes, and interfaces. To use them, enable Zed's `code_lens` setting:
-
-```json
-{
-  "code_lens": "on"
-}
-```
-
-You can override the default code lens settings in your Zed settings:
+The default is pinned to **`0.25.0-ts7.1.0-beta`**, not `latest`. To choose another exact published version with the same distribution layout:
 
 ```json
 {
   "lsp": {
-    "typescript-ls": {
+    "tsrs": {
       "settings": {
-        "typescript": {
-          "implementationsCodeLens": {
-            "enabled": false
-          },
-          "referencesCodeLens": {
-            "enabled": false
-          }
-        }
+        "package_version": "0.25.0-ts7.1.0-beta"
       }
     }
   }
 }
 ```
 
-Use the same settings under `javascript` to override them for JavaScript.
+`package_version` is an extension setting, removed before forwarding workspace configuration to the server. Tags and ranges are rejected. Changing the pin does not update an explicit or PATH binary.
+
+Managed installation downloads npm packages using Zed's Node/npm runtime and registry configuration. This requires network access on first use (or after cache deletion), downloads native third-party code, and may require corporate proxy/registry configuration. No paid service or API key is required. Keep npm optional dependencies enabled.
+
+Published targets: Windows and macOS x64/ARM64; Linux x64/ARM64, GNU and musl. 32-bit x86 is unsupported for managed installation. Linux libc detection uses Zed's host Node runtime. The extension launches the native package executable directly, retaining all bundled `.d.ts` files and notices. Separate version/platform directories under the extension work directory's `tsrs-versions/` prevent worktrees with different pins from replacing each other's running binaries. Valid caches are reused without registry version queries. Old versions are intentionally not automatically pruned.
+
+## LSP configuration
+
+Zed merges global/project LSP settings for the current worktree. `lsp.tsrs.initialization_options` is forwarded unchanged. `lsp.tsrs.settings`, excluding `package_version`, is forwarded as workspace configuration. No `tsgo` fallback, forced inlay-hint defaults, code-lens defaults, or JSON-array merging is applied. Only send settings supported by your chosen `tsrs` release; forwarding does not guarantee upstream support.
+
+## Compatibility and limitations
+
+- `tsrs` is experimental and tracks native TypeScript 7. **TypeScript 6 is manual, experimental opt-in**, not a promise of TS6 semantics or feature parity.
+- No TypeScript-version detection or automatic selection is implemented. Server choice belongs to Zed.
+- The pinned Windows binary passes the standalone LSP smoke test. Linux/macOS checks are configured in CI but were not run locally. ARM64/musl mappings have unit coverage, not local native execution coverage.
+- The pinned release acknowledges shutdown but may exit with code 1 and exactly `context canceled`; the smoke test narrowly tolerates that known upstream behavior. Do not interpret it as clean exit-code conformance.
+- Dev-extension loading, actual Zed server selection/isolation, npm/pnpm/yarn monorepos, and full feature compatibility still need the manual checks in [docs/validation.md](docs/validation.md).
+
+## Troubleshooting
+
+- **No server starts:** ensure the `tsrs` extension loads, the exact language name is selected, and Zed is recent enough to support opt-in manifests. Inspect Zed's language server logs.
+- **Two TypeScript servers start:** use the exclusive lists above, not `"..."` or an additional server name.
+- **Wrong binary/version:** inspect `binary.path` and the worktree PATH first; both override managed pins. Restart the language server after changing settings.
+- **Cannot launch a custom binary:** check the absolute host path, executable permissions/architecture, CLI compatibility, and neighboring library files. npm wrappers may not be directly executable on Windows.
+- **Installation fails:** check Zed's npm runtime, proxy/registry access, optional dependency settings, and the exact release's native package availability. Errors identify the missing package or asset. No fallback to a mismatched cached version is attempted.
+- **Broken cache:** stop affected servers, remove only the affected `tsrs-versions/<version>/<platform>` directory from the extension work directory, and restart. The next launch installs again.
+- **Module resolution differs:** reproduce with the same native `tsrs` version outside Zed, preserving the project's package manager, tsconfig, and workspace root. Report upstream compiler behavior separately from extension launch issues.
+
+## Development checks
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --all-targets -- -D warnings
+cargo test --all-targets
+cargo build --release --target wasm32-wasip1
+node scripts/smoke-test.mjs /absolute/path/to/native/tsrs
+```
+
+The dependency-free smoke test creates a temporary project, checks all four language IDs plus completion/hover/definition/diagnostics, and tests shutdown with bounded deadlines. CI installs the pinned native distribution and runs it on Windows, Linux, and macOS x64. It does not automate the Zed GUI or certify all project/package-manager combinations.
+
+## License and attribution
+
+Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE). The original repository scaffold and extension patterns came from [zed-extensions/tsgo](https://github.com/zed-extensions/tsgo); this adapter replaces the inherited tsgo-specific behavior. `tsrs` is a separate upstream project with its own notices, retained in managed packages.

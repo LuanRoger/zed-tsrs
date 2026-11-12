@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: Rust checks and WASI build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-wasip1
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --all-targets
+      - name: Build extension
+        run: cargo build --release --target wasm32-wasip1
+
+  native-smoke:
+    name: Native LSP smoke (${{ matrix.platform }}, x64)
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux
+            package: '@tsrs/linux-x64-gnu'
+          - runner: macos-15-intel
+            platform: darwin
+            package: '@tsrs/darwin-x64'
+          - runner: windows-2022
+            platform: win32
+            package: '@tsrs/win32-x64'
+    runs-on: ${{ matrix.runner }}
+    env:
+      TSRS_VERSION: 0.25.0-ts7.1.0-beta
+      TSRS_PACKAGE: ${{ matrix.package }}
+      TSRS_PLATFORM: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned published tsrs
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/tsrs-smoke-install" --no-save --package-lock=false --no-audit --no-fund "tsrs@$TSRS_VERSION"
+      - name: Resolve native executable and run LSP smoke test
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { spawnSync } from 'node:child_process';
+          import { createRequire } from 'node:module';
+          import path from 'node:path';
+
+          assert.equal(process.platform, process.env.TSRS_PLATFORM);
+          assert.equal(process.arch, 'x64');
+          const prefix = path.join(process.env.RUNNER_TEMP, 'tsrs-smoke-install');
+          const require = createRequire(path.join(prefix, 'resolve.cjs'));
+          assert.equal(require('tsrs/package.json').version, process.env.TSRS_VERSION);
+          const nativeManifest = require.resolve(`${process.env.TSRS_PACKAGE}/package.json`);
+          assert.equal(require(nativeManifest).version, process.env.TSRS_VERSION);
+          // Invoke the optional native package directly, never npm's JS/.cmd shim.
+          const binary = path.join(path.dirname(nativeManifest), process.platform === 'win32' ? 'tsrs.exe' : 'tsrs');
+          const result = spawnSync(process.execPath, ['scripts/smoke-test.mjs', binary], { stdio: 'inherit' });
+          if (result.error) throw result.error;
+          assert.equal(result.status, 0, `Smoke test failed (signal: ${result.signal})`);
+          NODE
