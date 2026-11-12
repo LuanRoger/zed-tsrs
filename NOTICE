@@ -4,7 +4,7 @@ This extension adapts the repository scaffold and language-server integration
 patterns from zed-extensions/tsgo, distributed under the Apache License 2.0:
 https://github.com/zed-extensions/tsgo
 
-Modified for the independent, opt-in tsrs language server: extension metadata,
+Modified for the independent, tsrs language server: extension metadata,
 binary overrides, pinned native installation, settings, tests and documentation.
 The original Apache-2.0 license is retained in LICENSE.
 

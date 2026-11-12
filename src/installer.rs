@@ -5,8 +5,8 @@ use zed_extension_api::{self as zed, LanguageServerId, Result, serde_json::Value
 
 use crate::platform::{self, NativePlatform};
 
-// Published on npm, including all eight native optional dependencies. Layout:
-// https://github.com/oxc-project/tsrs/blob/main/npm/build.mjs
+// Published on npm, including all eight native optional dependencies.
+// Layout: https://github.com/oxc-project/tsrs/blob/main/npm/build.mjs
 pub const DEFAULT_PACKAGE_VERSION: &str = "0.25.0-ts7.1.0-beta";
 const PACKAGE: &str = "tsrs";
 
@@ -32,10 +32,6 @@ pub fn managed_binary(id: &LanguageServerId, version: &str) -> Result<String> {
         &zed::LanguageServerInstallationStatus::Downloading,
     );
 
-    // API 0.7 npm functions always operate in the extension work directory.
-    // Zed serializes extension calls. Keep this scratch installation separate
-    // from every returned binary: switching worktrees must never replace a
-    // running server's executable or its on-disk default libraries.
     let scratch = cwd.join("node_modules");
     for package in [PACKAGE, platform.package.as_str()] {
         remove_dir(&scratch.join(package))?;
@@ -76,12 +72,13 @@ pub fn managed_binary(id: &LanguageServerId, version: &str) -> Result<String> {
             )
         })?;
     }
+
     validate_install(&staging, version, &platform)?;
-    // Invalid/partial caches are replaced only after a complete installation has
-    // been validated. Other version/platform directories are never pruned.
     remove_dir(&cache)?;
+
     fs::rename(&staging, &cache)
         .map_err(|e| format!("Cannot publish tsrs cache {}: {e}", cache.display()))?;
+
     let binary = validate_install(&cache, version, &platform)?;
     Ok(binary.to_string_lossy().into_owned())
 }
@@ -104,9 +101,7 @@ fn validate_install(root: &Path, version: &str, platform: &NativePlatform) -> Re
     let manifest = package_manifest(&native, &platform.package, version)?;
     let binary = native.join(platform.executable);
     nonempty_file(&binary)?;
-    // npm/build.mjs lists the complete set of bundled declarations in `files`.
-    // Check all of them, not just lib.d.ts: missing DOM/ESNext libs can otherwise
-    // silently break diagnostics long after an apparently successful install.
+
     let files = manifest
         .get("files")
         .and_then(Value::as_array)
@@ -117,6 +112,7 @@ fn validate_install(root: &Path, version: &str, platform: &NativePlatform) -> Re
             )
         })?;
     let mut libraries = 0;
+
     for file in files.iter().filter_map(Value::as_str) {
         if file.starts_with("lib.") && file.ends_with(".d.ts") {
             if file.contains(['/', '\\']) {

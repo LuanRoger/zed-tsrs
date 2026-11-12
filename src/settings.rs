@@ -16,8 +16,7 @@ pub(crate) fn binary_source(
         if path.trim().is_empty() {
             return Err("lsp.tsrs.binary.path must not be empty; set an absolute native executable path or remove the override to use PATH/managed installation".into());
         }
-        // Host paths are outside the WASM filesystem. Zed validates/launches
-        // them; do not test them with std::fs inside the sandbox.
+
         return Ok(BinarySource::Local(path));
     }
     Ok(which().map_or(BinarySource::Managed, BinarySource::Local))

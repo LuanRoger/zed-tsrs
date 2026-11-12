@@ -23,8 +23,6 @@ impl zed::Extension for TsrsExtension {
             arguments: None,
             env: None,
         });
-        // Resolve settings on every launch: one extension instance can serve
-        // worktrees with different overrides and managed version pins.
         let command = match settings::binary_source(binary.path, || worktree.which("tsrs"))? {
             settings::BinarySource::Local(path) => path,
             settings::BinarySource::Managed => {
@@ -32,6 +30,7 @@ impl zed::Extension for TsrsExtension {
                 installer::managed_binary(id, version)?
             }
         };
+        
         Ok(zed::Command {
             command,
             args: binary
