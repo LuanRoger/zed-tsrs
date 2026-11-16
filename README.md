@@ -4,17 +4,6 @@ An independent, **opt-in** Zed extension for the [tsrs](https://github.com/oxc-p
 
 Installing this extension does not select it for existing projects. It does not proxy LSP, change other servers' settings, or automatically switch servers based on a project's TypeScript version.
 
-## Install for development
-
-Requires Rust and a current Zed release supporting manifest `opt_in_languages` and extension API 0.7.0. Older editors must be upgraded; do not remove the manifest's opt-in declarations as a workaround.
-
-```sh
-rustup target add wasm32-wasip1
-cargo build --release --target wasm32-wasip1
-```
-
-In Zed, run **zed: install dev extension** from the command palette and select this repository. Zed builds the extension; a native `tsrs` server runs outside the extension's WASM sandbox. This repository is not a claim of marketplace availability.
-
 ## Enable per project
 
 Add this to the target project's `.zed/settings.json`:
@@ -89,7 +78,7 @@ Zed merges global/project LSP settings for the current worktree. `lsp.tsrs.initi
 
 - `tsrs` is experimental and tracks native TypeScript 7. **TypeScript 6 is manual, experimental opt-in**, not a promise of TS6 semantics or feature parity.
 - No TypeScript-version detection or automatic selection is implemented. Server choice belongs to Zed.
-- The pinned Windows binary passes the standalone LSP smoke test. Linux/macOS checks are configured in CI but were not run locally. ARM64/musl mappings have unit coverage, not local native execution coverage.
+- The pinned Windows binary passes the standalone LSP smoke test. Linux/macOS native execution has not been verified locally. ARM64/musl mappings have unit coverage, not local native execution coverage.
 - The pinned release acknowledges shutdown but may exit with code 1 and exactly `context canceled`; the smoke test narrowly tolerates that known upstream behavior. Do not interpret it as clean exit-code conformance.
 - Dev-extension loading, actual Zed server selection/isolation, npm/pnpm/yarn monorepos, and full feature compatibility still need the manual checks in [docs/validation.md](docs/validation.md).
 
@@ -113,7 +102,7 @@ cargo build --release --target wasm32-wasip1
 node scripts/smoke-test.mjs /absolute/path/to/native/tsrs
 ```
 
-The dependency-free smoke test creates a temporary project, checks all four language IDs plus completion/hover/definition/diagnostics, and tests shutdown with bounded deadlines. CI installs the pinned native distribution and runs it on Windows, Linux, and macOS x64. It does not automate the Zed GUI or certify all project/package-manager combinations.
+The dependency-free smoke test creates a temporary project, checks all four language IDs plus completion/hover/definition/diagnostics, and tests shutdown with bounded deadlines. Run it against the pinned native distribution on each platform you want to validate. It does not automate the Zed GUI or certify all project/package-manager combinations.
 
 ## License and attribution
 
