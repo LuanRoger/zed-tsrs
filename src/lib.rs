@@ -1,4 +1,5 @@
 // Adapted from zed-extensions/tsgo (Apache-2.0); modified for tsrs.
+
 mod installer;
 mod platform;
 mod settings;
